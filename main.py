@@ -1,189 +1,199 @@
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+import customtkinter as ctk
+from tkinter import filedialog, messagebox
 import threading
 import yt_dlp
 import os
 import re
 import sys
 
-# =====================
-# WINDOW & STYLE
-# =====================
-root = tk.Tk()
-root.title("Video Downloader v3.0")
-root.geometry("750x700")
-root.configure(bg="#020617")
-root.resizable(False, False)
 
-BTN = {"font": ("Arial", 10, "bold"), "bg": "#1e293b", "fg": "white", "activebackground": "#334155", "bd": 0, "padx": 10, "pady": 5}
-LABEL = {"bg": "#020617", "fg": "#f8fafc", "font": ("Arial", 10)}
+# CONFIG & THEME
 
-download_path = tk.StringVar()
-is_downloading = False
-BASE_PATH = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
 
-# =====================
-# UI COMPONENTS
-# =====================
-# URL Input
-tk.Label(root, text="URL Video / YouTube", **LABEL).pack(anchor="w", padx=25, pady=(20, 0))
-url_entry = tk.Entry(root, font=("Arial", 11), bg="#1e293b", fg="white", insertbackground="white", bd=5, relief="flat")
-url_entry.pack(fill="x", padx=25, pady=5)
+class VideoDownloader(ctk.CTk):
+    def __init__(self):
+        super().__init__()
 
-# Queue & Folder Actions
-action_frame = tk.Frame(root, bg="#020617")
-action_frame.pack(fill="x", padx=25, pady=5)
-
-def add_to_queue():
-    url = url_entry.get().strip()
-    if url:
-        queue_listbox.insert(tk.END, url)
-        url_entry.delete(0, tk.END)
-    else:
-        messagebox.showwarning("Peringatan", "Masukkan URL terlebih dahulu!")
-
-tk.Button(action_frame, text="+ Tambah ke Antrean", command=add_to_queue, **BTN).pack(side="left")
-tk.Button(action_frame, text="🗑️ Hapus Antrean", command=lambda: queue_listbox.delete(tk.ANCHOR), **BTN).pack(side="left", padx=10)
-
-# Listbox for Queue
-queue_listbox = tk.Listbox(root, height=5, bg="#0f172a", fg="#94a3b8", font=("Arial", 9), bd=0, highlightthickness=1)
-queue_listbox.pack(fill="x", padx=25, pady=5)
-
-# Folder Path
-tk.Label(root, text="Folder Tujuan", **LABEL).pack(anchor="w", padx=25, pady=(10, 0))
-path_frame = tk.Frame(root, bg="#020617")
-path_frame.pack(fill="x", padx=25)
-
-path_entry = tk.Entry(path_frame, textvariable=download_path, font=("Arial", 10), bg="#1e293b", fg="white", bd=5, relief="flat")
-path_entry.pack(side="left", fill="x", expand=True)
-
-def browse():
-    folder = filedialog.askdirectory()
-    if folder: download_path.set(folder)
-
-tk.Button(path_frame, text="Browse", command=browse, **BTN).pack(side="left", padx=(10, 0))
-
-# Quality Select
-tk.Label(root, text="Kualitas & Format", **LABEL).pack(anchor="w", padx=25, pady=(15, 0))
-quality_box = ttk.Combobox(root, values=["Best Quality", "720p (MP4)", "480p (MP4)", "Audio Only (MP3)"], state="readonly")
-quality_box.current(0)
-quality_box.pack(fill="x", padx=25, pady=5)
-
-# Status & Progress
-info_label = tk.Label(root, text="Judul: -", bg="#020617", font=("Arial", 10), fg="#38bdf8", wraplength=650, justify="left")
-info_label.pack(anchor="w", padx=25, pady=10)
-
-progress_label = tk.Label(root, text="Siap mengunduh", fg="#94a3b8", bg="#020617", font=("Arial", 9))
-progress_label.pack(pady=(5, 0))
-
-progress_bar = ttk.Progressbar(root, orient="horizontal", length=650, mode="determinate")
-progress_bar.pack(pady=10, padx=25)
-
-status_label = tk.Label(root, text="Status: Idle", fg="#4ade80", bg="#020617", font=("Arial", 10, "bold"))
-status_label.pack(pady=5)
-
-# =====================
-# LOGIC
-# =====================
-def open_folder():
-    path = download_path.get()
-    if os.path.exists(path):
-        os.startfile(path)
-
-def process_queue():
-    global is_downloading
-    if is_downloading: return
-    
-    folder = download_path.get()
-    if not folder:
-        messagebox.showwarning("Peringatan", "Pilih folder tujuan dulu!")
-        return
-
-    urls = queue_listbox.get(0, tk.END)
-    if not urls:
-        messagebox.showwarning("Peringatan", "Antrean kosong!")
-        return
-
-    is_downloading = True
-    btn_download.config(state="disabled", text="RUNNING...")
-    
-    threading.Thread(target=download_engine, args=(urls, folder), daemon=True).start()
-
-def download_engine(urls, folder):
-    global is_downloading
-    quality = quality_box.get()
-
-    def hook(d):
-        if d['status'] == 'downloading':
-            p_str = d.get('_percent_str', '0%')
-            clean_p = re.sub(r'\x1b\[[0-9;]*m', '', p_str).replace('%', '').strip()
-            speed = d.get('_speed_str', 'N/A')
-            eta = d.get('_eta_str', 'N/A')
-            size = d.get('_total_bytes_str', d.get('_total_bytes_estimate_str', 'N/A'))
-            
-            try:
-                progress_bar['value'] = float(clean_p)
-                progress_label.config(text=f"Size: {size} | Speed: {speed} | ETA: {eta}")
-                root.update_idletasks()
-            except: pass
-
-    for url in urls:
-        status_label.config(text=f"Status: Fetching info...", fg="#38bdf8")
+        self.title("Video Downloader v3.5")
+        self.geometry("850x600")
         
-        ydl_opts = {
-            'outtmpl': os.path.join(folder, '%(title)s.%(ext)s'),
-            'progress_hooks': [hook],
-            'ffmpeg_location': BASE_PATH,
-            'quiet': True,
-            'nocheckcertificate': True
-        }
+        # State
+        self.download_path = ctk.StringVar()
+        self.is_downloading = False
+        self.BASE_PATH = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
 
-        # Format Logic
-        if quality == "720p (MP4)":
-            ydl_opts['format'] = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best"
-        elif quality == "480p (MP4)":
-            ydl_opts['format'] = "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best"
-        elif quality == "Audio Only (MP3)":
-            ydl_opts['format'] = "bestaudio/best"
-            ydl_opts['postprocessors'] = [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'}]
+        # UI Layout
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        # =====================
+        # SIDEBAR
+        # =====================
+        self.sidebar = ctk.CTkFrame(self, width=200, corner_radius=0)
+        self.sidebar.grid(row=0, column=0, sticky="nsew")
+        
+        self.logo = ctk.CTkLabel(self.sidebar, text="V-DL PRO", font=ctk.CTkFont(size=20, weight="bold"))
+        self.logo.pack(pady=30, padx=20)
+
+        self.btn_browse = ctk.CTkButton(self.sidebar, text="📁 Pilih Folder", command=self.browse, fg_color="#334155")
+        self.btn_browse.pack(pady=10, padx=20)
+        
+        self.btn_open = ctk.CTkButton(self.sidebar, text="📂 Buka Folder", command=self.open_folder, fg_color="transparent", border_width=1)
+        self.btn_open.pack(pady=10, padx=20)
+
+        self.appearance_mode_label = ctk.CTkLabel(self.sidebar, text="Theme:", anchor="w")
+        self.appearance_mode_label.pack(side="bottom", padx=20, pady=(0, 10))
+        
+        # =====================
+        # MAIN CONTENT
+        # =====================
+        self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+
+        # URL Input Section
+        self.url_label = ctk.CTkLabel(self.main_frame, text="URL Video / YouTube", font=ctk.CTkFont(size=13))
+        self.url_label.pack(anchor="w", pady=(0, 5))
+        
+        self.url_entry = ctk.CTkEntry(self.main_frame, placeholder_text="Paste link di sini...", height=40)
+        self.url_entry.pack(fill="x", pady=(0, 10))
+
+        # Queue Buttons
+        self.q_btn_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.q_btn_frame.pack(fill="x", pady=5)
+        
+        self.btn_add = ctk.CTkButton(self.q_btn_frame, text="+ Tambah Antrean", command=self.add_to_queue, width=150)
+        self.btn_add.pack(side="left")
+        
+        self.btn_del = ctk.CTkButton(self.q_btn_frame, text="🗑️ Hapus", command=self.delete_selected, fg_color="#ef4444", hover_color="#dc2626", width=100)
+        self.btn_del.pack(side="left", padx=10)
+
+        # Queue List
+        self.queue_list = ctk.CTkTextbox(self.main_frame, height=120, fg_color="#0f172a", text_color="#94a3b8")
+        self.queue_list.pack(fill="x", pady=10)
+        self.queue_data = [] # Store raw URLs
+
+        # Quality & Folder Info
+        self.info_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.info_frame.pack(fill="x", pady=10)
+
+        self.quality_box = ctk.CTkComboBox(self.info_frame, values=["Best Quality", "720p (MP4)", "480p (MP4)", "Audio Only (MP3)"], width=200)
+        self.quality_box.pack(side="left")
+        
+        self.path_display = ctk.CTkLabel(self.info_frame, textvariable=self.download_path, text_color="#64748b", font=ctk.CTkFont(size=11))
+        self.path_display.pack(side="left", padx=20)
+
+        # Progress Section
+        self.info_label = ctk.CTkLabel(self.main_frame, text="Judul: -", font=ctk.CTkFont(size=12, weight="bold"), text_color="#38bdf8")
+        self.info_label.pack(anchor="w", pady=(20, 5))
+
+        self.progress_bar = ctk.CTkProgressBar(self.main_frame, orientation="horizontal")
+        self.progress_bar.set(0)
+        self.progress_bar.pack(fill="x", pady=10)
+
+        self.status_label = ctk.CTkLabel(self.main_frame, text="Status: Idle", text_color="#4ade80")
+        self.status_label.pack()
+
+        self.btn_download = ctk.CTkButton(self.main_frame, text="DOWNLOAD SEKARANG", command=self.process_queue, height=50, font=ctk.CTkFont(size=14, weight="bold"), fg_color="#0ea5e9", hover_color="#0284c7")
+        self.btn_download.pack(fill="x", pady=20)
+
+    # =====================
+    # LOGIC FUNCTIONS
+    # =====================
+    def browse(self):
+        folder = filedialog.askdirectory()
+        if folder: self.download_path.set(folder)
+
+    def open_folder(self):
+        path = self.download_path.get()
+        if os.path.exists(path): os.startfile(path)
+
+    def add_to_queue(self):
+        url = self.url_entry.get().strip()
+        if url:
+            self.queue_data.append(url)
+            self.update_listbox()
+            self.url_entry.delete(0, 'end')
         else:
-            ydl_opts['format'] = "bestvideo+bestaudio/best"
-            ydl_opts['merge_output_format'] = "mp4"
+            messagebox.showwarning("Peringatan", "Isi URL dulu brok!")
 
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # Feature: Fetch Metadata
-                meta = ydl.extract_info(url, download=False)
-                info_label.config(text=f"Judul: {meta.get('title', 'Unknown')}")
+    def delete_selected(self):
+        if self.queue_data:
+            self.queue_data.pop() # Sederhananya hapus yang terakhir
+            self.update_listbox()
+
+    def update_listbox(self):
+        self.queue_list.delete("0.0", "end")
+        for i, url in enumerate(self.queue_data):
+            self.queue_list.insert("end", f"{i+1}. {url}\n")
+
+    def process_queue(self):
+        if self.is_downloading: return
+        if not self.download_path.get():
+            messagebox.showwarning("Peringatan", "Pilih folder dulu!")
+            return
+        if not self.queue_data:
+            messagebox.showwarning("Peringatan", "Antrean kosong!")
+            return
+
+        self.is_downloading = True
+        self.btn_download.configure(state="disabled", text="SEDANG PROSES...")
+        threading.Thread(target=self.download_engine, daemon=True).start()
+
+    def download_engine(self):
+        folder = self.download_path.get()
+        quality = self.quality_box.get()
+
+        def hook(d):
+            if d['status'] == 'downloading':
+                p_str = d.get('_percent_str', '0%')
+                clean_p = re.sub(r'\x1b\[[0-9;]*m', '', p_str).replace('%', '').strip()
+                try:
+                    val = float(clean_p) / 100
+                    self.progress_bar.set(val)
+                    speed = d.get('_speed_str', 'N/A')
+                    eta = d.get('_eta_str', 'N/A')
+                    self.status_label.configure(text=f"Speed: {speed} | ETA: {eta}")
+                except: pass
+
+        while self.queue_data:
+            url = self.queue_data[0]
+            self.status_label.configure(text="Status: Fetching Metadata...", text_color="#38bdf8")
+            
+            ydl_opts = {
+                'outtmpl': os.path.join(folder, '%(title)s.%(ext)s'),
+                'progress_hooks': [hook],
+                'ffmpeg_location': self.BASE_PATH,
+                'quiet': True
+            }
+
+            if "720p" in quality: ydl_opts['format'] = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best"
+            elif "480p" in quality: ydl_opts['format'] = "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best"
+            elif "Audio" in quality:
+                ydl_opts['format'] = "bestaudio/best"
+                ydl_opts['postprocessors'] = [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'}]
+            else:
+                ydl_opts['format'] = "bestvideo+bestaudio/best"
+                ydl_opts['merge_output_format'] = "mp4"
+
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    meta = ydl.extract_info(url, download=False)
+                    self.info_label.configure(text=f"Judul: {meta.get('title', 'Unknown')[:80]}...")
+                    ydl.download([url])
                 
-                status_label.config(text=f"Status: Downloading...", fg="#fbbf24")
-                ydl.download([url])
-                
-            # Hapus yang sudah selesai dari listbox
-            queue_listbox.delete(0)
-        except Exception as e:
-            messagebox.showerror("Error", f"Gagal download {url}\n{str(e)}")
-            break
+                self.queue_data.pop(0)
+                self.after(0, self.update_listbox)
+            except Exception as e:
+                messagebox.showerror("Error", f"Gagal: {url}")
+                break
 
-    status_label.config(text="Status: Semua Selesai! ✅", fg="#4ade80")
-    is_downloading = False
-    btn_download.config(state="normal", text="START DOWNLOAD QUEUE")
-    messagebox.showinfo("Sukses", "Semua file dalam antrean telah diproses.")
+        self.status_label.configure(text="Semua Selesai! ✅", text_color="#4ade80")
+        self.is_downloading = False
+        self.btn_download.configure(state="normal", text="DOWNLOAD SEKARANG")
+        self.progress_bar.set(0)
 
-# =====================
-# ACTION BUTTONS
-# =====================
-btn_frame = tk.Frame(root, bg="#020617")
-btn_frame.pack(pady=10)
-
-BTN_BLUE = BTN.copy()
-BTN_BLUE.update({"bg": "#0ea5e9"})
-
-btn_download = tk.Button(btn_frame, text="START DOWNLOAD QUEUE", command=process_queue, **BTN_BLUE)
-btn_download.pack(side="left", padx=5)
-btn_download.pack(side="left", padx=5)
-
-btn_folder = tk.Button(btn_frame, text="📂 Buka Folder", command=open_folder, **BTN)
-btn_folder.pack(side="left", padx=5)
-
-root.mainloop()
+if __name__ == "__main__":
+    app = VideoDownloader()
+    app.mainloop()
