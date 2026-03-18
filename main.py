@@ -6,9 +6,9 @@ import os
 import re
 import sys
 
-
+# =====================
 # CONFIG & THEME
-
+# =====================
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
@@ -43,8 +43,8 @@ class VideoDownloader(ctk.CTk):
         self.btn_open = ctk.CTkButton(self.sidebar, text="📂 Buka Folder", command=self.open_folder, fg_color="transparent", border_width=1)
         self.btn_open.pack(pady=10, padx=20)
 
-        self.appearance_mode_label = ctk.CTkLabel(self.sidebar, text="Theme:", anchor="w")
-        self.appearance_mode_label.pack(side="bottom", padx=20, pady=(0, 10))
+        self.appearance_mode_label = ctk.CTkLabel(self.sidebar, text="Theme: Dark", anchor="w")
+        self.appearance_mode_label.pack(side="bottom", padx=20, pady=(0, 20))
         
         # =====================
         # MAIN CONTENT
@@ -72,13 +72,14 @@ class VideoDownloader(ctk.CTk):
         # Queue List
         self.queue_list = ctk.CTkTextbox(self.main_frame, height=120, fg_color="#0f172a", text_color="#94a3b8")
         self.queue_list.pack(fill="x", pady=10)
-        self.queue_data = [] # Store raw URLs
+        self.queue_data = [] 
 
         # Quality & Folder Info
         self.info_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.info_frame.pack(fill="x", pady=10)
 
         self.quality_box = ctk.CTkComboBox(self.info_frame, values=["Best Quality", "720p (MP4)", "480p (MP4)", "Audio Only (MP3)"], width=200)
+        self.quality_box.set("Best Quality")
         self.quality_box.pack(side="left")
         
         self.path_display = ctk.CTkLabel(self.info_frame, textvariable=self.download_path, text_color="#64748b", font=ctk.CTkFont(size=11))
@@ -120,7 +121,7 @@ class VideoDownloader(ctk.CTk):
 
     def delete_selected(self):
         if self.queue_data:
-            self.queue_data.pop() # Sederhananya hapus yang terakhir
+            self.queue_data.pop() 
             self.update_listbox()
 
     def update_listbox(self):
@@ -155,7 +156,8 @@ class VideoDownloader(ctk.CTk):
                     speed = d.get('_speed_str', 'N/A')
                     eta = d.get('_eta_str', 'N/A')
                     self.status_label.configure(text=f"Speed: {speed} | ETA: {eta}")
-                except: pass
+                except:
+                    pass
 
         while self.queue_data:
             url = self.queue_data[0]
@@ -165,29 +167,43 @@ class VideoDownloader(ctk.CTk):
                 'outtmpl': os.path.join(folder, '%(title)s.%(ext)s'),
                 'progress_hooks': [hook],
                 'ffmpeg_location': self.BASE_PATH,
-                'quiet': True
+                'quiet': True,
+                'nocheckcertificate': True
             }
 
-            if "720p" in quality: ydl_opts['format'] = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best"
-            elif "480p" in quality: ydl_opts['format'] = "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best"
+            # Format Logic: Memaksa H.264 (avc1)
+            if "720p" in quality:
+                ydl_opts['format'] = "bestvideo[height<=720][vcodec^=avc1]+bestaudio[ext=m4a]/best[vcodec^=avc1]/best"
+                ydl_opts['merge_output_format'] = "mp4"
+            elif "480p" in quality:
+                ydl_opts['format'] = "bestvideo[height<=480][vcodec^=avc1]+bestaudio[ext=m4a]/best[vcodec^=avc1]/best"
+                ydl_opts['merge_output_format'] = "mp4"
             elif "Audio" in quality:
                 ydl_opts['format'] = "bestaudio/best"
-                ydl_opts['postprocessors'] = [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'}]
+                ydl_opts['postprocessors'] = [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192'
+                }]
             else:
-                ydl_opts['format'] = "bestvideo+bestaudio/best"
+                ydl_opts['format'] = "bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]/best[vcodec^=avc1]/best"
                 ydl_opts['merge_output_format'] = "mp4"
 
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     meta = ydl.extract_info(url, download=False)
-                    self.info_label.configure(text=f"Judul: {meta.get('title', 'Unknown')[:80]}...")
+                    title = meta.get('title', 'Unknown')
+                    self.info_label.configure(text=f"Judul: {title[:70]}...")
+                    
+                    self.status_label.configure(text="Status: Downloading...", text_color="#fbbf24")
                     ydl.download([url])
                 
+                # Selesai satu, hapus dari list
                 self.queue_data.pop(0)
                 self.after(0, self.update_listbox)
             except Exception as e:
-                messagebox.showerror("Error", f"Gagal: {url}")
-                break
+                self.after(0, lambda: messagebox.showerror("Error", f"Gagal download {url}\n{str(e)}"))
+                break 
 
         self.status_label.configure(text="Semua Selesai! ✅", text_color="#4ade80")
         self.is_downloading = False
