@@ -1,5 +1,7 @@
 # Downloader-video
-Ini downloader video cara jalaninnya make yt-dlp lu download dlu trs tinggal run make python 
+Ini adalah downloader video cara jalaninnya make yt-dlp lu download dlu trs tinggal run make python 
+<img width="1024" height="576" alt="Image" src="https://github.com/user-attachments/assets/4390ce10-697d-46a4-983f-e3ce22bfa69a" />
+Berikut adalah preview apps
 # Update V2
 Update baru V2:
 Sekarang App downloader video ini sudah bisa memlih kualitas video 720p, 480p, atau hanya audio untuk pemilihan kualitas pastikan telah menginstall ffmpeg dan requests (opsional)
