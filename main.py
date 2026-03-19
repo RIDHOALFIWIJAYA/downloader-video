@@ -33,14 +33,14 @@ class VideoDownloader(ctk.CTk):
         self.grid_rowconfigure(0, weight=1)
 
         # SIDEBAR
-        self.sidebar = ctk.CTkFrame(self, width=220, corner_radius=0)
+        self.sidebar = ctk.CTkFrame(self, width=210, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         
-        self.logo = ctk.CTkLabel(self.sidebar, text="V-DL v4.0", font=ctk.CTkFont(size=20, weight="bold"))
-        self.logo.pack(pady=30, padx=20)
+        self.logo = ctk.CTkLabel(self.sidebar, text="V-DL v4.0", text_color="#87CEEB", font=ctk.CTkFont(size=25, weight="bold"), fg_color="#334155", corner_radius=14)
+        self.logo.pack(pady=30, padx=15)
 
         # Thumbnail Box di Sidebar
-        self.thumb_label = ctk.CTkLabel(self.sidebar, text="Preview Thumbnail", width=180, height=110, 
+        self.thumb_label = ctk.CTkLabel(self.sidebar, text="Thumbnail..", text_color="#87CEEB", width=200, height=120, 
                                         fg_color="#0f172a", corner_radius=8)
         self.thumb_label.pack(pady=10, padx=20)
 
@@ -50,7 +50,11 @@ class VideoDownloader(ctk.CTk):
         self.btn_open = ctk.CTkButton(self.sidebar, text="📂 Buka Folder", command=self.open_folder, fg_color="transparent", border_width=1)
         self.btn_open.pack(pady=10, padx=20)
 
-        self.history_label = ctk.CTkLabel(self.sidebar, text="JSON History Active ✅", font=ctk.CTkFont(size=10), text_color="#64748b")
+        # TOMBOL HISTORY (NEW)
+        self.btn_history = ctk.CTkButton(self.sidebar, text="📜 Lihat History", command=self.show_history, fg_color="#1e293b", hover_color="#334155")
+        self.btn_history.pack(pady=10, padx=20)
+
+        self.history_label = ctk.CTkLabel(self.sidebar, text="History disimpan dalam JSON", font=ctk.CTkFont(size=10), text_color="#64748b")
         self.history_label.pack(side="bottom", pady=20)
         
         # MAIN CONTENT
@@ -92,7 +96,7 @@ class VideoDownloader(ctk.CTk):
         self.path_display.pack(side="left", padx=20)
 
         # Progress Section
-        self.info_label = ctk.CTkLabel(self.main_frame, text="Judul: -", font=ctk.CTkFont(size=12, weight="bold"), text_color="#38bdf8", wraplength=600, justify="left")
+        self.info_label = ctk.CTkLabel(self.main_frame, text="Judul:...", font=ctk.CTkFont(size=12, weight="bold"), text_color="#38bdf8", wraplength=600, justify="left")
         self.info_label.pack(anchor="w", pady=(20, 5))
 
         self.progress_bar = ctk.CTkProgressBar(self.main_frame, orientation="horizontal")
@@ -102,13 +106,56 @@ class VideoDownloader(ctk.CTk):
         self.status_label = ctk.CTkLabel(self.main_frame, text="Status: Idle", text_color="#4ade80")
         self.status_label.pack()
 
-        self.btn_download = ctk.CTkButton(self.main_frame, text="START DOWNLOAD QUEUE", command=self.process_queue, height=50, font=ctk.CTkFont(size=14, weight="bold"), fg_color="#0ea5e9", hover_color="#0284c7")
+        self.btn_download = ctk.CTkButton(self.main_frame, text="Start Download", command=self.process_queue, height=50, font=ctk.CTkFont(size=14, weight="bold"), fg_color="#0ea5e9", hover_color="#0284c7")
         self.btn_download.pack(fill="x", pady=20)
 
-    # =====================
     # LOGIC FUNCTIONS
-    # =====================
     
+    def show_history(self):
+        # Window Baru buat History
+        history_window = ctk.CTkToplevel(self)
+        history_window.title("History Download")
+        history_window.geometry("700x550")
+        history_window.attributes('-topmost', True)
+
+        ctk.CTkLabel(history_window, text="Riwayat Download Video", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
+
+        # Frame buat Scroll
+        scroll_frame = ctk.CTkScrollableFrame(history_window, width=650, height=380)
+        scroll_frame.pack(padx=20, pady=5, fill="both", expand=True)
+
+        # Tombol Hapus History
+        btn_clear = ctk.CTkButton(history_window, text="🗑️ Bersihkan Semua History", fg_color="#ef4444", hover_color="#dc2626", 
+                                  command=lambda: self.clear_history(history_window))
+        btn_clear.pack(pady=15)
+
+        if os.path.exists(self.history_file):
+            try:
+                with open(self.history_file, "r") as f:
+                    data = json.load(f)
+                    if not data:
+                        ctk.CTkLabel(scroll_frame, text="History masih kosong brok.").pack(pady=20)
+                    for item in reversed(data):
+                        card = ctk.CTkFrame(scroll_frame, fg_color="#1e293b", corner_radius=8)
+                        card.pack(fill="x", pady=5, padx=5)
+                        
+                        title_lbl = ctk.CTkLabel(card, text=f"🎥 {item['title']}", anchor="w", font=ctk.CTkFont(weight="bold"), wraplength=600, justify="left")
+                        title_lbl.pack(padx=10, pady=(8,0), anchor="w")
+                        
+                        info_lbl = ctk.CTkLabel(card, text=f"📅 {item['timestamp']} | 🔗 {item['url'][:50]}...", font=ctk.CTkFont(size=10), text_color="#94a3b8")
+                        info_lbl.pack(padx=10, pady=(0,8), anchor="w")
+            except:
+                ctk.CTkLabel(scroll_frame, text="Gagal baca file history.").pack()
+        else:
+            ctk.CTkLabel(scroll_frame, text="Belum ada riwayat download.").pack()
+
+    def clear_history(self, window):
+        if messagebox.askyesno("Konfirmasi", "Hapus semua riwayat download?"):
+            with open(self.history_file, "w") as f:
+                json.dump([], f)
+            window.destroy()
+            messagebox.showinfo("Sukses", "History berhasil dibersihkan!")
+
     def fetch_preview(self):
         url = self.url_entry.get().strip()
         if not url: return
@@ -117,29 +164,20 @@ class VideoDownloader(ctk.CTk):
 
     def _get_meta_thread(self, url):
         try:
-            # Bypass SSL dan percepat fetch
             ydl_opts = {'quiet': True, 'nocheckcertificate': True, 'no_warnings': True}
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 thumb_url = info.get('thumbnail')
                 title = info.get('title')
-                
-                # Update Judul via main thread
                 self.after(0, lambda: self.info_label.configure(text=f"Judul: {title}"))
-                
-                # Download Gambar Thumbnail (verify=False untuk bypass SSL Error)
                 response = requests.get(thumb_url, verify=False, timeout=10)
                 img_data = BytesIO(response.content)
                 img = Image.open(img_data)
-                
-                # Resize ke format CTkImage
                 ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(180, 101))
-                
-                # Update Label via main thread
                 self.after(0, lambda: self.thumb_label.configure(image=ctk_img, text=""))
         except Exception as e:
             print(f"Error Preview: {e}")
-            self.after(0, lambda: self.thumb_label.configure(text="Preview Gagal", image=None))
+            self.after(0, lambda: self.thumb_label.configure(text="Maaf thumbnail tidak ada..", image=None))
 
     def save_to_json(self, title, url):
         data = []
@@ -171,7 +209,7 @@ class VideoDownloader(ctk.CTk):
         if url:
             self.queue_data.append(url)
             self.update_listbox()
-            self.fetch_preview() # <--- Triger preview pas klik tambah
+            self.fetch_preview() 
             self.url_entry.delete(0, 'end')
         else:
             messagebox.showwarning("Peringatan", "Isi URL dulu brok!")
@@ -245,10 +283,8 @@ class VideoDownloader(ctk.CTk):
                     meta = ydl.extract_info(url, download=False)
                     title = meta.get('title', 'Unknown')
                     self.info_label.configure(text=f"Judul: {title}")
-                    
                     self.status_label.configure(text="Status: Downloading...", text_color="#fbbf24")
                     ydl.download([url])
-                    
                     self.save_to_json(title, url)
                 
                 self.queue_data.pop(0)
@@ -259,7 +295,7 @@ class VideoDownloader(ctk.CTk):
 
         self.status_label.configure(text="Semua Selesai! ✅", text_color="#4ade80")
         self.is_downloading = False
-        self.btn_download.configure(state="normal", text="START DOWNLOAD QUEUE")
+        self.btn_download.configure(state="normal", text="Start Download")
         self.progress_bar.set(0)
 
 if __name__ == "__main__":
