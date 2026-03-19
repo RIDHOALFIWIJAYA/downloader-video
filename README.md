@@ -7,3 +7,5 @@ Sekarang App downloader video ini sudah bisa memlih kualitas video 720p, 480p, a
 kali ini ada perbaikan logic dan sedikit improvisasi UI serta tambahan fitur fitur kecil lainnya seperti antrian dan lain lain.
 # Update V3.5
 kali ini ada improve UI besar besaran dari tkinter biasa ke custom tkinter 
+# Update v4.0
+kali ini ada penambahan fitur untuk menampilkan thumbnail video yang akan didownload dan sekarang sudah bisa menyimpan histori memakai json
