@@ -19,9 +19,9 @@ class VideoDownloader(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Video Downloader v4.0")
-        self.geometry("900x650")
-        
+        self.title("Video Downloader v5.0 - Smart Metadata & Size") # Update Versi
+        self.geometry("900x700") # Tinggi ditambah dikit buat info size
+
         # State
         self.download_path = ctk.StringVar()
         self.is_downloading = False
@@ -35,8 +35,8 @@ class VideoDownloader(ctk.CTk):
         # SIDEBAR
         self.sidebar = ctk.CTkFrame(self, width=210, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
-        
-        self.logo = ctk.CTkLabel(self.sidebar, text="V-DL v4.0", text_color="#87CEEB", font=ctk.CTkFont(size=25, weight="bold"), fg_color="#334155", corner_radius=14)
+
+        self.logo = ctk.CTkLabel(self.sidebar, text="V-DL v5.0", text_color="#87CEEB", font=ctk.CTkFont(size=25, weight="bold"), fg_color="#334155", corner_radius=14)
         self.logo.pack(pady=30, padx=15)
 
         # Thumbnail Box di Sidebar
@@ -44,19 +44,25 @@ class VideoDownloader(ctk.CTk):
                                         fg_color="#0f172a", corner_radius=8)
         self.thumb_label.pack(pady=10, padx=20)
 
+        # NEW: Info Size & Durasi di Sidebar
+        self.size_label = ctk.CTkLabel(self.sidebar, text="Size: -", font=ctk.CTkFont(size=12))
+        self.size_label.pack(pady=2)
+        self.duration_label = ctk.CTkLabel(self.sidebar, text="Durasi: -", font=ctk.CTkFont(size=12))
+        self.duration_label.pack(pady=2)
+
         self.btn_browse = ctk.CTkButton(self.sidebar, text="📁 Pilih Folder", command=self.browse, fg_color="#334155")
         self.btn_browse.pack(pady=10, padx=20)
-        
+
         self.btn_open = ctk.CTkButton(self.sidebar, text="📂 Buka Folder", command=self.open_folder, fg_color="transparent", border_width=1)
         self.btn_open.pack(pady=10, padx=20)
 
-        # TOMBOL HISTORY (NEW)
+        # TOMBOL HISTORY
         self.btn_history = ctk.CTkButton(self.sidebar, text="📜 Lihat History", command=self.show_history, fg_color="#1e293b", hover_color="#334155")
         self.btn_history.pack(pady=10, padx=20)
 
-        self.history_label = ctk.CTkLabel(self.sidebar, text="History disimpan dalam JSON", font=ctk.CTkFont(size=10), text_color="#64748b")
+        self.history_label = ctk.CTkLabel(self.sidebar, text="Metadata & Size Active", font=ctk.CTkFont(size=10), text_color="#4ade80")
         self.history_label.pack(side="bottom", pady=20)
-        
+
         # MAIN CONTENT
         self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
@@ -64,18 +70,18 @@ class VideoDownloader(ctk.CTk):
         # URL Input Section
         self.url_label = ctk.CTkLabel(self.main_frame, text="URL Video / YouTube", font=ctk.CTkFont(size=13))
         self.url_label.pack(anchor="w", pady=(0, 5))
-        
+
         self.url_entry = ctk.CTkEntry(self.main_frame, placeholder_text="Paste link dan klik Enter untuk preview...", height=40)
         self.url_entry.pack(fill="x", pady=(0, 10))
-        self.url_entry.bind("<Return>", lambda e: self.fetch_preview()) # Preview pas tekan Enter
+        self.url_entry.bind("<Return>", lambda e: self.fetch_preview()) 
 
         # Queue Buttons
         self.q_btn_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.q_btn_frame.pack(fill="x", pady=5)
-        
+
         self.btn_add = ctk.CTkButton(self.q_btn_frame, text="+ Tambah Antrean", command=self.add_to_queue, width=150)
         self.btn_add.pack(side="left")
-        
+
         self.btn_del = ctk.CTkButton(self.q_btn_frame, text="🗑️ Hapus Terakhir", command=self.delete_selected, fg_color="#ef4444", hover_color="#dc2626", width=120)
         self.btn_del.pack(side="left", padx=10)
 
@@ -91,7 +97,7 @@ class VideoDownloader(ctk.CTk):
         self.quality_box = ctk.CTkComboBox(self.info_frame, values=["Best Quality", "720p (MP4)", "480p (MP4)", "Audio Only (MP3)"], width=200)
         self.quality_box.set("Best Quality")
         self.quality_box.pack(side="left")
-        
+
         self.path_display = ctk.CTkLabel(self.info_frame, textvariable=self.download_path, text_color="#64748b", font=ctk.CTkFont(size=11), wraplength=350)
         self.path_display.pack(side="left", padx=20)
 
@@ -110,21 +116,15 @@ class VideoDownloader(ctk.CTk):
         self.btn_download.pack(fill="x", pady=20)
 
     # LOGIC FUNCTIONS
-    
+
     def show_history(self):
-        # Window Baru buat History
         history_window = ctk.CTkToplevel(self)
         history_window.title("History Download")
         history_window.geometry("700x550")
         history_window.attributes('-topmost', True)
-
         ctk.CTkLabel(history_window, text="Riwayat Download Video", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
-
-        # Frame buat Scroll
         scroll_frame = ctk.CTkScrollableFrame(history_window, width=650, height=380)
         scroll_frame.pack(padx=20, pady=5, fill="both", expand=True)
-
-        # Tombol Hapus History
         btn_clear = ctk.CTkButton(history_window, text="🗑️ Bersihkan Semua History", fg_color="#ef4444", hover_color="#dc2626", 
                                   command=lambda: self.clear_history(history_window))
         btn_clear.pack(pady=15)
@@ -138,10 +138,8 @@ class VideoDownloader(ctk.CTk):
                     for item in reversed(data):
                         card = ctk.CTkFrame(scroll_frame, fg_color="#1e293b", corner_radius=8)
                         card.pack(fill="x", pady=5, padx=5)
-                        
                         title_lbl = ctk.CTkLabel(card, text=f"🎥 {item['title']}", anchor="w", font=ctk.CTkFont(weight="bold"), wraplength=600, justify="left")
                         title_lbl.pack(padx=10, pady=(8,0), anchor="w")
-                        
                         info_lbl = ctk.CTkLabel(card, text=f"📅 {item['timestamp']} | 🔗 {item['url'][:50]}...", font=ctk.CTkFont(size=10), text_color="#94a3b8")
                         info_lbl.pack(padx=10, pady=(0,8), anchor="w")
             except:
@@ -160,6 +158,8 @@ class VideoDownloader(ctk.CTk):
         url = self.url_entry.get().strip()
         if not url: return
         self.thumb_label.configure(text="Loading...", image=None)
+        # NEW: Reset label size pas fetch baru
+        self.size_label.configure(text="Size: Fetching...")
         threading.Thread(target=self._get_meta_thread, args=(url,), daemon=True).start()
 
     def _get_meta_thread(self, url):
@@ -169,7 +169,17 @@ class VideoDownloader(ctk.CTk):
                 info = ydl.extract_info(url, download=False)
                 thumb_url = info.get('thumbnail')
                 title = info.get('title')
+                
+                # NEW: Ambil estimasi size & durasi
+                filesize = info.get('filesize') or info.get('filesize_approx')
+                size_str = f"{filesize / (1024*1024):.1f} MB" if filesize else "Unknown"
+                duration = info.get('duration')
+                dur_str = f"{duration // 60}:{duration % 60:02d}" if duration else "-:--"
+
                 self.after(0, lambda: self.info_label.configure(text=f"Judul: {title}"))
+                self.after(0, lambda: self.size_label.configure(text=f"Size: ~{size_str}"))
+                self.after(0, lambda: self.duration_label.configure(text=f"Durasi: {dur_str}"))
+
                 response = requests.get(thumb_url, verify=False, timeout=10)
                 img_data = BytesIO(response.content)
                 img = Image.open(img_data)
@@ -178,6 +188,7 @@ class VideoDownloader(ctk.CTk):
         except Exception as e:
             print(f"Error Preview: {e}")
             self.after(0, lambda: self.thumb_label.configure(text="Maaf thumbnail tidak ada..", image=None))
+            self.after(0, lambda: self.size_label.configure(text="Size: Error"))
 
     def save_to_json(self, title, url):
         data = []
@@ -186,13 +197,7 @@ class VideoDownloader(ctk.CTk):
                 with open(self.history_file, "r") as f:
                     data = json.load(f)
             except: data = []
-        
-        data.append({
-            "title": title,
-            "url": url,
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        })
-        
+        data.append({"title": title, "url": url, "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
         with open(self.history_file, "w") as f:
             json.dump(data, f, indent=4)
 
@@ -232,7 +237,6 @@ class VideoDownloader(ctk.CTk):
         if not self.queue_data:
             messagebox.showwarning("Peringatan", "Antrean kosong!")
             return
-
         self.is_downloading = True
         self.btn_download.configure(state="disabled", text="SEDANG PROSES...")
         threading.Thread(target=self.download_engine, daemon=True).start()
@@ -256,13 +260,19 @@ class VideoDownloader(ctk.CTk):
         while self.queue_data:
             url = self.queue_data[0]
             self.status_label.configure(text="Status: Fetching Metadata...", text_color="#38bdf8")
-            
+
+            # NEW: Ditambahin 'writethumbnail' & postprocessors buat metadata
             ydl_opts = {
                 'outtmpl': os.path.join(folder, '%(title)s.%(ext)s'),
                 'progress_hooks': [hook],
                 'ffmpeg_location': self.BASE_PATH,
                 'quiet': True,
-                'nocheckcertificate': True
+                'nocheckcertificate': True,
+                'writethumbnail': True, # Wajib buat ambil cover art
+                'postprocessors': [
+                    {'key': 'FFmpegMetadata', 'add_metadata': True}, # Nambahin judul/artist ke file
+                    {'key': 'EmbedThumbnail'} # Nanam thumbnail ke dalem file
+                ]
             }
 
             if "720p" in quality:
@@ -271,22 +281,22 @@ class VideoDownloader(ctk.CTk):
                 ydl_opts['format'] = "bestvideo[height<=480][vcodec^=avc1]+bestaudio[ext=m4a]/best[vcodec^=avc1]/best"
             elif "Audio" in quality:
                 ydl_opts['format'] = "bestaudio/best"
-                ydl_opts['postprocessors'] = [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'}]
+                # NEW: Masukin ke index 0 biar metadata tetep jalan setelah convert mp3
+                ydl_opts['postprocessors'].insert(0, {'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'})
             else:
                 ydl_opts['format'] = "bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]/best[vcodec^=avc1]/best"
-            
+
             if "Audio" not in quality:
                 ydl_opts['merge_output_format'] = "mp4"
 
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    meta = ydl.extract_info(url, download=False)
-                    title = meta.get('title', 'Unknown')
-                    self.info_label.configure(text=f"Judul: {title}")
+                    # Ganti extract_info download=True biar postprocessor jalan sempurna
                     self.status_label.configure(text="Status: Downloading...", text_color="#fbbf24")
-                    ydl.download([url])
+                    meta = ydl.extract_info(url, download=True)
+                    title = meta.get('title', 'Unknown')
                     self.save_to_json(title, url)
-                
+
                 self.queue_data.pop(0)
                 self.after(0, self.update_listbox)
             except Exception as e:
