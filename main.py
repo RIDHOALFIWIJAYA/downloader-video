@@ -19,7 +19,7 @@ class VideoDownloader(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Video Downloader v5.0 - Smart Metadata & Size") # Update Versi
+        self.title("Video Downloader v5.1 - Anti-Gagal Edition") # Update Versi
         self.geometry("900x700") # Tinggi ditambah dikit buat info size
 
         # State
@@ -36,7 +36,7 @@ class VideoDownloader(ctk.CTk):
         self.sidebar = ctk.CTkFrame(self, width=210, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
 
-        self.logo = ctk.CTkLabel(self.sidebar, text="V-DL v5.0", text_color="#87CEEB", font=ctk.CTkFont(size=25, weight="bold"), fg_color="#334155", corner_radius=14)
+        self.logo = ctk.CTkLabel(self.sidebar, text="V-DL v5.1", text_color="#87CEEB", font=ctk.CTkFont(size=25, weight="bold"), fg_color="#334155", corner_radius=14)
         self.logo.pack(pady=30, padx=15)
 
         # Thumbnail Box di Sidebar
@@ -60,7 +60,7 @@ class VideoDownloader(ctk.CTk):
         self.btn_history = ctk.CTkButton(self.sidebar, text="📜 Lihat History", command=self.show_history, fg_color="#1e293b", hover_color="#334155")
         self.btn_history.pack(pady=10, padx=20)
 
-        self.history_label = ctk.CTkLabel(self.sidebar, text="Metadata & Size Active", font=ctk.CTkFont(size=10), text_color="#4ade80")
+        self.history_label = ctk.CTkLabel(self.sidebar, text="Auto-Retry Active", font=ctk.CTkFont(size=10), text_color="#4ade80")
         self.history_label.pack(side="bottom", pady=20)
 
         # MAIN CONTENT
@@ -158,7 +158,6 @@ class VideoDownloader(ctk.CTk):
         url = self.url_entry.get().strip()
         if not url: return
         self.thumb_label.configure(text="Loading...", image=None)
-        # NEW: Reset label size pas fetch baru
         self.size_label.configure(text="Size: Fetching...")
         threading.Thread(target=self._get_meta_thread, args=(url,), daemon=True).start()
 
@@ -170,7 +169,6 @@ class VideoDownloader(ctk.CTk):
                 thumb_url = info.get('thumbnail')
                 title = info.get('title')
                 
-                # NEW: Ambil estimasi size & durasi
                 filesize = info.get('filesize') or info.get('filesize_approx')
                 size_str = f"{filesize / (1024*1024):.1f} MB" if filesize else "Unknown"
                 duration = info.get('duration')
@@ -261,17 +259,21 @@ class VideoDownloader(ctk.CTk):
             url = self.queue_data[0]
             self.status_label.configure(text="Status: Fetching Metadata...", text_color="#38bdf8")
 
-            # NEW: Ditambahin 'writethumbnail' & postprocessors buat metadata
+            # NEW: Ditambahin fitur AUTO-RETRY & CONTINUE Download
             ydl_opts = {
                 'outtmpl': os.path.join(folder, '%(title)s.%(ext)s'),
                 'progress_hooks': [hook],
                 'ffmpeg_location': self.BASE_PATH,
                 'quiet': True,
                 'nocheckcertificate': True,
-                'writethumbnail': True, # Wajib buat ambil cover art
+                'writethumbnail': True, 
+                'retries': 15,          # Mencoba ulang hingga 15 kali jika gagal koneksi
+                'fragment_retries': 15, # Mencoba ulang fragmen video jika terputus
+                'retry_sleep': 5,       # Jeda 5 detik antar percobaan
+                'continuedl': True,     # Melanjutkan download yang tertunda (Resume)
                 'postprocessors': [
-                    {'key': 'FFmpegMetadata', 'add_metadata': True}, # Nambahin judul/artist ke file
-                    {'key': 'EmbedThumbnail'} # Nanam thumbnail ke dalem file
+                    {'key': 'FFmpegMetadata', 'add_metadata': True}, 
+                    {'key': 'EmbedThumbnail'} 
                 ]
             }
 
@@ -281,7 +283,6 @@ class VideoDownloader(ctk.CTk):
                 ydl_opts['format'] = "bestvideo[height<=480][vcodec^=avc1]+bestaudio[ext=m4a]/best[vcodec^=avc1]/best"
             elif "Audio" in quality:
                 ydl_opts['format'] = "bestaudio/best"
-                # NEW: Masukin ke index 0 biar metadata tetep jalan setelah convert mp3
                 ydl_opts['postprocessors'].insert(0, {'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'})
             else:
                 ydl_opts['format'] = "bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]/best[vcodec^=avc1]/best"
@@ -291,7 +292,6 @@ class VideoDownloader(ctk.CTk):
 
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    # Ganti extract_info download=True biar postprocessor jalan sempurna
                     self.status_label.configure(text="Status: Downloading...", text_color="#fbbf24")
                     meta = ydl.extract_info(url, download=True)
                     title = meta.get('title', 'Unknown')
@@ -307,6 +307,10 @@ class VideoDownloader(ctk.CTk):
         self.is_downloading = False
         self.btn_download.configure(state="normal", text="Start Download")
         self.progress_bar.set(0)
+        
+        # Tambahan kecil: Buka folder otomatis biar user ga bingung nyari filenya
+        if os.path.exists(folder):
+            os.startfile(folder)
 
 if __name__ == "__main__":
     app = VideoDownloader()
