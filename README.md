@@ -65,12 +65,13 @@ Sebelum menjalankan, pastikan perangkat Anda sudah terinstall:
 - Fitur **Auto-Tagging**: Otomatis menyematkan thumbnail sebagai cover art pada file.
 - Penambahan info durasi video.
 
-### 🆕 Update v4.0
-- Integrasi **Thumbnail Preview**.
-- Sistem riwayat download menggunakan format **JSON**.
+### 🆕 Update v5.1
+- Penambahan logic untuk **Parallel Download**.
+- Dan improvement beberapa logic di app.
 
-### 🆕 Update v3.5
-- Migrasi besar-besaran dari `Tkinter` standar ke `CustomTkinter` (Modern Look).
+### 🆕 Update v5.2
+- penambahan fitur untuk otomatis menyalin dari clipboard.
+  **Note pastikan untuk menyalin tautan video terlebih dahulu setelah itu baru jalankan appnya.**
 
 ---
 
