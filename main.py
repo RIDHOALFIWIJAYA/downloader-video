@@ -10,7 +10,7 @@ import requests
 from PIL import Image
 from io import BytesIO
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor # NEW: Untuk Multi-threading
+from concurrent.futures import ThreadPoolExecutor 
 
 # CONFIG & THEME
 ctk.set_appearance_mode("dark")
@@ -20,13 +20,14 @@ class VideoDownloader(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Video Downloader v5.2 - Multi-Thread Turbo") # Update Versi
+        self.title("Video Downloader v5.3 - Smart Clipboard Edition") # Update Versi
         self.geometry("900x700")
 
         # State
         self.download_path = ctk.StringVar()
         self.is_downloading = False
         self.history_file = "history.json"
+        self.last_clipboard = "" # Untuk track clipboard terakhir
         self.BASE_PATH = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
 
         # UI Layout
@@ -37,7 +38,7 @@ class VideoDownloader(ctk.CTk):
         self.sidebar = ctk.CTkFrame(self, width=210, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
 
-        self.logo = ctk.CTkLabel(self.sidebar, text="V-DL v5.2", text_color="#87CEEB", font=ctk.CTkFont(size=25, weight="bold"), fg_color="#334155", corner_radius=14)
+        self.logo = ctk.CTkLabel(self.sidebar, text="V-DL v5.3", text_color="#87CEEB", font=ctk.CTkFont(size=25, weight="bold"), fg_color="#334155", corner_radius=14)
         self.logo.pack(pady=30, padx=15)
 
         # Thumbnail Box
@@ -59,17 +60,17 @@ class VideoDownloader(ctk.CTk):
         self.btn_history = ctk.CTkButton(self.sidebar, text="📜 Lihat History", command=self.show_history, fg_color="#1e293b", hover_color="#334155")
         self.btn_history.pack(pady=10, padx=20)
 
-        self.history_label = ctk.CTkLabel(self.sidebar, text="Turbo Multi-Thread Active", font=ctk.CTkFont(size=10), text_color="#38bdf8")
+        self.history_label = ctk.CTkLabel(self.sidebar, text="Clipboard Monitor Active", font=ctk.CTkFont(size=10), text_color="#4ade80")
         self.history_label.pack(side="bottom", pady=20)
 
         # MAIN CONTENT
         self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
 
-        self.url_label = ctk.CTkLabel(self.main_frame, text="URL Video / YouTube", font=ctk.CTkFont(size=13))
+        self.url_label = ctk.CTkLabel(self.main_frame, text="URL Video / YouTube (Auto-detect active)", font=ctk.CTkFont(size=13))
         self.url_label.pack(anchor="w", pady=(0, 5))
 
-        self.url_entry = ctk.CTkEntry(self.main_frame, placeholder_text="Paste link dan klik Enter untuk preview...", height=40)
+        self.url_entry = ctk.CTkEntry(self.main_frame, placeholder_text="Copy link dari browser dan aplikasi akan mendeteksi...", height=40)
         self.url_entry.pack(fill="x", pady=(0, 10))
         self.url_entry.bind("<Return>", lambda e: self.fetch_preview()) 
 
@@ -109,7 +110,26 @@ class VideoDownloader(ctk.CTk):
         self.btn_download = ctk.CTkButton(self.main_frame, text="Start Download", command=self.process_queue, height=50, font=ctk.CTkFont(size=14, weight="bold"), fg_color="#0ea5e9", hover_color="#0284c7")
         self.btn_download.pack(fill="x", pady=20)
 
-    # LOGIC FUNCTIONS (History, Preview, etc Tetap Sama)
+        # START CLIPBOARD MONITORING
+        self.check_clipboard()
+
+    # --- NEW: CLIPBOARD MONITORING LOGIC ---
+    def check_clipboard(self):
+        try:
+            current_clipboard = self.clipboard_get().strip()
+            # Cek jika clipboard adalah URL video yang valid dan berbeda dari sebelumnya
+            if current_clipboard != self.last_clipboard:
+                if "youtube.com/" in current_clipboard or "youtu.be/" in current_clipboard or "http" in current_clipboard:
+                    self.url_entry.delete(0, 'end')
+                    self.url_entry.insert(0, current_clipboard)
+                    self.last_clipboard = current_clipboard
+                    self.fetch_preview() # Auto-preview begitu terdeteksi
+        except:
+            pass
+        # Jalankan pengecekan setiap 1.5 detik
+        self.after(1500, self.check_clipboard)
+
+    # LOGIC FUNCTIONS (Tetap Sama)
     def show_history(self):
         history_window = ctk.CTkToplevel(self)
         history_window.title("History Download")
@@ -194,6 +214,7 @@ class VideoDownloader(ctk.CTk):
             self.queue_data.append(url)
             self.update_listbox()
             self.url_entry.delete(0, 'end')
+            self.last_clipboard = "" # Reset agar bisa detect link yang sama jika di-copy ulang
         else: messagebox.showwarning("Peringatan", "Isi URL dulu brok!")
 
     def delete_selected(self):
@@ -206,36 +227,29 @@ class VideoDownloader(ctk.CTk):
         for i, url in enumerate(self.queue_data):
             self.queue_list.insert("end", f"{i+1}. {url}\n")
 
-    # --- MODIFIED: MULTI-THREADING ENGINE ---
     def process_queue(self):
         if self.is_downloading: return
         if not self.download_path.get() or not self.queue_data:
             messagebox.showwarning("Peringatan", "Lengkapi folder & antrean!")
             return
-        
+
         self.is_downloading = True
         self.btn_download.configure(state="disabled", text="TURBO DOWNLOADING...")
-        
-        # Jalankan master thread supaya UI nggak freeze
         threading.Thread(target=self.master_download_thread, daemon=True).start()
 
     def master_download_thread(self):
         folder = self.download_path.get()
         quality = self.quality_box.get()
-        
-        # NEW: Pakai ThreadPoolExecutor untuk paralel download (Max 3 video sekaligus)
+
         with ThreadPoolExecutor(max_workers=3) as executor:
             urls = list(self.queue_data)
             self.queue_data.clear()
             self.after(0, self.update_listbox)
-            
-            # Kirim semua URL ke worker
             executor.map(lambda u: self.download_engine(u, folder, quality), urls)
 
         self.after(0, self.finish_all)
 
     def download_engine(self, url, folder, quality):
-        # Progress hook lokal untuk tiap thread
         def hook(d):
             if d['status'] == 'downloading':
                 p_str = d.get('_percent_str', '0%')
@@ -256,14 +270,13 @@ class VideoDownloader(ctk.CTk):
             'postprocessors': [{'key': 'FFmpegMetadata', 'add_metadata': True}, {'key': 'EmbedThumbnail'}]
         }
 
-        # Format Logic (Tetap Sama)
         if "720p" in quality: ydl_opts['format'] = "bestvideo[height<=720][vcodec^=avc1]+bestaudio[ext=m4a]/best[vcodec^=avc1]/best"
         elif "480p" in quality: ydl_opts['format'] = "bestvideo[height<=480][vcodec^=avc1]+bestaudio[ext=m4a]/best[vcodec^=avc1]/best"
         elif "Audio" in quality:
             ydl_opts['format'] = "bestaudio/best"
             ydl_opts['postprocessors'].insert(0, {'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'})
         else: ydl_opts['format'] = "bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]/best[vcodec^=avc1]/best"
-        
+
         if "Audio" not in quality: ydl_opts['merge_output_format'] = "mp4"
 
         try:
