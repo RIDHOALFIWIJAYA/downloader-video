@@ -20,7 +20,7 @@ class VideoDownloader(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Video Downloader v5.3 - Smart Clipboard Edition") # Update Versi
+        self.title("Video Downloader v5.3") # Update Versi
         self.geometry("900x700")
 
         # State
