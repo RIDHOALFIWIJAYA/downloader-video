@@ -20,14 +20,14 @@ class VideoDownloader(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Video Downloader v5.3") # Update Versi
-        self.geometry("900x700")
+        self.title("Video Downloader v5.4") # Update Versi
+        self.geometry("900(750") # Tinggi ditambah sedikit untuk menu tema
 
         # State
         self.download_path = ctk.StringVar()
         self.is_downloading = False
         self.history_file = "history.json"
-        self.last_clipboard = "" # Untuk track clipboard terakhir
+        self.last_clipboard = "" 
         self.BASE_PATH = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
 
         # UI Layout
@@ -38,7 +38,7 @@ class VideoDownloader(ctk.CTk):
         self.sidebar = ctk.CTkFrame(self, width=210, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
 
-        self.logo = ctk.CTkLabel(self.sidebar, text="V-DL v5.3", text_color="#87CEEB", font=ctk.CTkFont(size=25, weight="bold"), fg_color="#334155", corner_radius=14)
+        self.logo = ctk.CTkLabel(self.sidebar, text="V-DL v5.4", text_color="#87CEEB", font=ctk.CTkFont(size=25, weight="bold"), fg_color="#334155", corner_radius=14)
         self.logo.pack(pady=30, padx=15)
 
         # Thumbnail Box
@@ -60,24 +60,33 @@ class VideoDownloader(ctk.CTk):
         self.btn_history = ctk.CTkButton(self.sidebar, text="📜 Lihat History", command=self.show_history, fg_color="#1e293b", hover_color="#334155")
         self.btn_history.pack(pady=10, padx=20)
 
-        self.history_label = ctk.CTkLabel(self.sidebar, text="Clipboard Monitor Active", font=ctk.CTkFont(size=10), text_color="#4ade80")
+        # --- NEW: THEME SWITCHER UI ---
+        self.theme_label = ctk.CTkLabel(self.sidebar, text="Appearance Mode:", font=ctk.CTkFont(size=11))
+        self.theme_label.pack(pady=(20, 0))
+        self.theme_option = ctk.CTkOptionMenu(self.sidebar, values=["Dark", "Light", "System"],
+                                               command=self.change_appearance_mode_event)
+        self.theme_option.set("Dark")
+        self.theme_option.pack(pady=10, padx=20)
+        # ------------------------------
+
+        self.history_label = ctk.CTkLabel(self.sidebar, text="Tambahan Dark mode and Light mode", font=ctk.CTkFont(size=10), text_color="#4ade80")
         self.history_label.pack(side="bottom", pady=20)
 
         # MAIN CONTENT
         self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
 
-        self.url_label = ctk.CTkLabel(self.main_frame, text="URL Video / YouTube (Auto-detect active)", font=ctk.CTkFont(size=13))
+        self.url_label = ctk.CTkLabel(self.main_frame, text="URL Video / YouTube (Deteksi clipboard otomatis)", font=ctk.CTkFont(size=13))
         self.url_label.pack(anchor="w", pady=(0, 5))
 
-        self.url_entry = ctk.CTkEntry(self.main_frame, placeholder_text="Copy link dari browser dan aplikasi akan mendeteksi...", height=40)
+        self.url_entry = ctk.CTkEntry(self.main_frame, placeholder_text="Copy link dari browser dan aplikasi akan mendeteksi...", height=35)
         self.url_entry.pack(fill="x", pady=(0, 10))
         self.url_entry.bind("<Return>", lambda e: self.fetch_preview()) 
 
         self.q_btn_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.q_btn_frame.pack(fill="x", pady=5)
 
-        self.btn_add = ctk.CTkButton(self.q_btn_frame, text="+ Tambah Antrean", command=self.add_to_queue, width=150)
+        self.btn_add = ctk.CTkButton(self.q_btn_frame, text="+ Tambah Antrean", command=self.add_to_queue, width=155)
         self.btn_add.pack(side="left")
 
         self.btn_del = ctk.CTkButton(self.q_btn_frame, text="🗑️ Hapus Terakhir", command=self.delete_selected, fg_color="#ef4444", hover_color="#dc2626", width=120)
@@ -107,29 +116,27 @@ class VideoDownloader(ctk.CTk):
         self.status_label = ctk.CTkLabel(self.main_frame, text="Status: Idle", text_color="#4ade80")
         self.status_label.pack()
 
-        self.btn_download = ctk.CTkButton(self.main_frame, text="Start Download", command=self.process_queue, height=50, font=ctk.CTkFont(size=14, weight="bold"), fg_color="#0ea5e9", hover_color="#0284c7")
+        self.btn_download = ctk.CTkButton(self.main_frame, text="Start Download", command=self.process_queue, height=50, font=ctk.CTkFont(size=14, weight="bold"), fg_color=("#0ea5e9", "#1f6aa5"), hover_color="#0284c7")
         self.btn_download.pack(fill="x", pady=20)
 
-        # START CLIPBOARD MONITORING
         self.check_clipboard()
 
-    # --- NEW: CLIPBOARD MONITORING LOGIC ---
+    # --- NEW: THEME EVENT ---
+    def change_appearance_mode_event(self, new_appearance_mode: str):
+        ctk.set_appearance_mode(new_appearance_mode)
+
     def check_clipboard(self):
         try:
             current_clipboard = self.clipboard_get().strip()
-            # Cek jika clipboard adalah URL video yang valid dan berbeda dari sebelumnya
             if current_clipboard != self.last_clipboard:
-                if "youtube.com/" in current_clipboard or "youtu.be/" in current_clipboard or "http" in current_clipboard:
+                if "http" in current_clipboard:
                     self.url_entry.delete(0, 'end')
                     self.url_entry.insert(0, current_clipboard)
                     self.last_clipboard = current_clipboard
-                    self.fetch_preview() # Auto-preview begitu terdeteksi
-        except:
-            pass
-        # Jalankan pengecekan setiap 1.5 detik
+                    self.fetch_preview()
+        except: pass
         self.after(1500, self.check_clipboard)
 
-    # LOGIC FUNCTIONS (Tetap Sama)
     def show_history(self):
         history_window = ctk.CTkToplevel(self)
         history_window.title("History Download")
@@ -214,7 +221,7 @@ class VideoDownloader(ctk.CTk):
             self.queue_data.append(url)
             self.update_listbox()
             self.url_entry.delete(0, 'end')
-            self.last_clipboard = "" # Reset agar bisa detect link yang sama jika di-copy ulang
+            self.last_clipboard = "" 
         else: messagebox.showwarning("Peringatan", "Isi URL dulu brok!")
 
     def delete_selected(self):
@@ -232,7 +239,6 @@ class VideoDownloader(ctk.CTk):
         if not self.download_path.get() or not self.queue_data:
             messagebox.showwarning("Peringatan", "Lengkapi folder & antrean!")
             return
-
         self.is_downloading = True
         self.btn_download.configure(state="disabled", text="TURBO DOWNLOADING...")
         threading.Thread(target=self.master_download_thread, daemon=True).start()
@@ -240,13 +246,11 @@ class VideoDownloader(ctk.CTk):
     def master_download_thread(self):
         folder = self.download_path.get()
         quality = self.quality_box.get()
-
         with ThreadPoolExecutor(max_workers=3) as executor:
             urls = list(self.queue_data)
             self.queue_data.clear()
             self.after(0, self.update_listbox)
             executor.map(lambda u: self.download_engine(u, folder, quality), urls)
-
         self.after(0, self.finish_all)
 
     def download_engine(self, url, folder, quality):
