@@ -1,4 +1,4 @@
-# 🚀 V-Downloader
+#  V-Downloader
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Framework](https://img.shields.io/badge/UI-CustomTkinter-orange.svg)](https://github.com/TomSchimansky/CustomTkinter)
@@ -17,6 +17,8 @@
 * **🎞️ Quality Selector:** Pilih resolusi 720p, 480p, atau **Audio Only (MP3)** dengan format H.264 (AVC) yang kompatibel di semua device.
 * **📜 History Manager:** Riwayat download tersimpan dalam `history.json` dan bisa dilihat langsung melalui UI aplikasi.
 * **🚀 Queue System:** Tambahkan banyak link ke antrean dan biarkan aplikasi menyelesaikannya satu per satu.
+* **🌐 Paralel download:** Mendownload semua file video langsung semua jadi tidak mendownload satu persatu lagi tetapi langsung semuanya.
+
 
 ---
 
