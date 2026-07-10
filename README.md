@@ -17,7 +17,7 @@
 * **🎞️ Quality Selector:** Pilih resolusi 720p, 480p, atau **Audio Only (MP3)** dengan format H.264 (AVC) yang kompatibel di semua device.
 * **📜 History Manager:** Riwayat download tersimpan dalam `history.json` dan bisa dilihat langsung melalui UI aplikasi.
 * **🚀 Queue System:** Tambahkan banyak link ke antrean dan biarkan aplikasi menyelesaikannya satu per satu.
-* **🌐 Paralel download:** Mendownload semua file video langsung semua jadi tidak mendownload satu persatu lagi tetapi langsung semuanya.
+* **🌐 Parallel Download:** Downloads up to 2 videos simultaneously using a thread pool for faster batch processing.
 
 
 ---
@@ -36,7 +36,7 @@ Sebelum menjalankan, pastikan perangkat Anda sudah terinstall:
 
 1.  **Python 3.10+**
 2.  **FFmpeg:** Wajib ada agar fitur penggabungan video/audio dan penulisan metadata (Cover Art) berfungsi.
-    * *Tips: Letakkan `ffmpeg.exe` di dalam folder project atau tambahkan ke PATH sistem.*
+    * *Tips: Ensure ffmpeg is installed on your system (e.g., `sudo apt install ffmpeg`) or specify its path.*
 
 ---
 
@@ -62,7 +62,15 @@ Sebelum menjalankan, pastikan perangkat Anda sudah terinstall:
 
 ## 📈 Log Update
 
-### 🆕 Update v5.0 (Latest)
+### 🆕 Update v5.4 (Latest)
+- Added theme switcher (Dark, Light, System mode).
+- Linux-optimized stable release with full UI compatibility.
+
+### 🆕 Update v5.3
+- UI overhaul for Linux compatibility.
+- Improved sidebar layout and widget styling.
+
+### 🆕 Update v5.0
 - Penambahan fitur **Size Estimation** (Estimasi ukuran file).
 - Fitur **Auto-Tagging**: Otomatis menyematkan thumbnail sebagai cover art pada file.
 - Penambahan info durasi video.
