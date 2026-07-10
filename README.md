@@ -44,7 +44,7 @@ Sebelum menjalankan, pastikan perangkat Anda sudah terinstall:
 
 1.  **Clone Repository:**
     ```bash
-    git clone [https://github.com/username-lo/downloader-video.git](https://github.com/username-lo/downloader-video.git)
+    git clone https://github.com/RIDHOALFIWIJAYA/downloader-video.git
     cd downloader-video
     ```
 
