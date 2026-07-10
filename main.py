@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import tkinter
 from tkinter import filedialog, messagebox
 import threading
 import yt_dlp
@@ -6,11 +7,13 @@ import os
 import re
 import sys
 import json
+import subprocess
 import requests
 from PIL import Image
 from io import BytesIO
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor 
+from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urlparse
 
 # CONFIG & THEME
 ctk.set_appearance_mode("dark")
@@ -27,7 +30,8 @@ class VideoDownloader(ctk.CTk):
         self.download_path = ctk.StringVar()
         self.is_downloading = False
         self.history_file = "history.json"
-        self.last_clipboard = "" 
+        self.last_clipboard = ""
+        self.queue_lock = threading.Lock()
         
         # UI Layout
         self.grid_columnconfigure(1, weight=1)
@@ -125,42 +129,54 @@ class VideoDownloader(ctk.CTk):
     def change_appearance_mode_event(self, new_appearance_mode: str):
         ctk.set_appearance_mode(new_appearance_mode)
 
+    def _is_valid_url(self, url):
+        try:
+            result = urlparse(url)
+            return result.scheme in ('http', 'https') and bool(result.netloc)
+        except (ValueError, TypeError):
+            return False
+
     def check_clipboard(self):
         try:
             current_clipboard = self.clipboard_get().strip()
-            if current_clipboard != self.last_clipboard and "http" in current_clipboard:
+            if current_clipboard != self.last_clipboard and self._is_valid_url(current_clipboard):
                 self.url_entry.delete(0, 'end')
                 self.url_entry.insert(0, current_clipboard)
                 self.last_clipboard = current_clipboard
                 self.fetch_preview()
-        except: pass
+        except (tkinter.TclError, OSError):
+            pass
         self.after(1500, self.check_clipboard)
 
     def fetch_preview(self):
         url = self.url_entry.get().strip()
-        if not url or "http" not in url: return
+        if not url or not self._is_valid_url(url): return
         self.thumb_label.configure(text="Loading...", image="")
         threading.Thread(target=self._get_meta_thread, args=(url,), daemon=True).start()
 
     def _get_meta_thread(self, url):
         try:
-            ydl_opts = {'quiet': True, 'nocheckcertificate': True}
+            ydl_opts = {'quiet': True}
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 thumb_url = info.get('thumbnail')
                 title = info.get('title')
                 filesize = info.get('filesize') or info.get('filesize_approx')
+                duration = info.get('duration')
                 size_str = f"{filesize / (1024*1024):.1f} MB" if filesize else "Unknown"
-                
+                dur_str = f"{duration // 60}m {duration % 60}s" if duration else "-"
+
                 self.after(0, lambda: self.info_label.configure(text=f"Judul: {title}"))
                 self.after(0, lambda: self.size_label.configure(text=f"Size: ~{size_str}"))
-                
+                self.after(0, lambda: self.duration_label.configure(text=f"Durasi: {dur_str}"))
+
                 resp = requests.get(thumb_url, timeout=10)
                 img = Image.open(BytesIO(resp.content))
                 ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(180, 101))
                 self.after(0, lambda: self.thumb_label.configure(image=ctk_img, text=""))
-        except:
+        except (yt_dlp.utils.DownloadError, requests.RequestException, OSError, ValueError) as e:
             self.after(0, lambda: self.thumb_label.configure(text="Preview Error", image=""))
+            self.after(0, lambda: self.status_label.configure(text=f"Preview Error: {e}"))
 
     def download_engine(self, url, folder, quality):
         def hook(d):
@@ -170,18 +186,20 @@ class VideoDownloader(ctk.CTk):
                 try:
                     self.after(0, lambda: self.progress_bar.set(float(clean_p)/100))
                     self.after(0, lambda: self.status_label.configure(text=f"Speed: {d.get('_speed_str','N/A')}"))
-                except: pass
+                except (ValueError, tkinter.TclError):
+                    pass
 
         # FIX: Hapus ffmpeg_location agar menggunakan sistem Linux
         ydl_opts = {
             'outtmpl': os.path.join(folder, '%(title)s.%(ext)s'),
             'progress_hooks': [hook],
-            'quiet': True, 'nocheckcertificate': True, 'writethumbnail': True, 
+            'quiet': True, 'writethumbnail': True,
             'continuedl': True,
             'postprocessors': [{'key': 'FFmpegMetadata'}, {'key': 'EmbedThumbnail'}]
         }
 
         if "720p" in quality: ydl_opts['format'] = "bestvideo[height<=720]+bestaudio/best"
+        elif "480p" in quality: ydl_opts['format'] = "bestvideo[height<=480]+bestaudio/best"
         elif "Audio" in quality:
             ydl_opts['format'] = "bestaudio/best"
             ydl_opts['postprocessors'].insert(0, {'key': 'FFmpegExtractAudio','preferredcodec': 'mp3'})
@@ -191,7 +209,8 @@ class VideoDownloader(ctk.CTk):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 meta = ydl.extract_info(url, download=True)
                 self.save_to_json(meta.get('title', 'Unknown'), url)
-        except Exception as e: print(f"Download Error: {e}")
+        except (yt_dlp.utils.DownloadError, OSError, ValueError) as e:
+            self.after(0, lambda: self.status_label.configure(text=f"Download Error: {e}"))
 
     # --- Sisa fungsi (History, Queue, dll) tetap sama ---
     def save_to_json(self, title, url):
@@ -199,7 +218,7 @@ class VideoDownloader(ctk.CTk):
         if os.path.exists(self.history_file):
             try:
                 with open(self.history_file, "r") as f: data = json.load(f)
-            except: data = []
+            except (json.JSONDecodeError, OSError): data = []
         data.append({"title": title, "url": url, "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
         with open(self.history_file, "w") as f: json.dump(data, f, indent=4)
 
@@ -209,20 +228,26 @@ class VideoDownloader(ctk.CTk):
 
     def open_folder(self):
         path = self.download_path.get()
-        if os.path.exists(path): os.startfile(path) if sys.platform == "win32" else os.system(f'xdg-open "{path}"')
+        if os.path.exists(path):
+            if sys.platform == "win32":
+                os.startfile(path)
+            else:
+                subprocess.run(['xdg-open', path])
 
     def add_to_queue(self):
         url = self.url_entry.get().strip()
-        if url and "http" in url:
-            self.queue_data.append(url)
+        if url and self._is_valid_url(url):
+            with self.queue_lock:
+                self.queue_data.append(url)
             self.update_listbox()
             self.url_entry.delete(0, 'end')
         else: messagebox.showwarning("Peringatan", "URL tidak valid!")
 
     def delete_selected(self):
-        if self.queue_data:
-            self.queue_data.pop() 
-            self.update_listbox()
+        with self.queue_lock:
+            if self.queue_data:
+                self.queue_data.pop()
+        self.update_listbox()
 
     def update_listbox(self):
         self.queue_list.delete("0.0", "end")
@@ -237,10 +262,11 @@ class VideoDownloader(ctk.CTk):
 
     def master_download_thread(self):
         folder, quality = self.download_path.get(), self.quality_box.get()
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        with self.queue_lock:
             urls = list(self.queue_data)
             self.queue_data.clear()
-            self.after(0, self.update_listbox)
+        self.after(0, self.update_listbox)
+        with ThreadPoolExecutor(max_workers=2) as executor:
             executor.map(lambda u: self.download_engine(u, folder, quality), urls)
         self.after(0, self.finish_all)
 
@@ -251,8 +277,29 @@ class VideoDownloader(ctk.CTk):
         messagebox.showinfo("V-DL", "Semua download selesai brok!")
 
     def show_history(self):
-        # Implementasi history tetap sama
-        pass
+        if not os.path.exists(self.history_file):
+            messagebox.showinfo("History", "Belum ada history download.")
+            return
+        try:
+            with open(self.history_file, "r") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            messagebox.showinfo("History", "File history corrupt atau tidak bisa dibaca.")
+            return
+        if not data:
+            messagebox.showinfo("History", "Belum ada history download.")
+            return
+        lines = []
+        for i, entry in enumerate(data[-20:], 1):
+            lines.append(f"{i}. {entry.get('title', '?')}\n   {entry.get('timestamp', '?')}\n   {entry.get('url', '?')}")
+        history_text = "\n\n".join(lines)
+        win = ctk.CTkToplevel(self)
+        win.title("Download History")
+        win.geometry("600x400")
+        textbox = ctk.CTkTextbox(win, wrap="word")
+        textbox.pack(fill="both", expand=True, padx=10, pady=10)
+        textbox.insert("0.0", history_text)
+        textbox.configure(state="disabled")
 
 if __name__ == "__main__":
     app = VideoDownloader()
