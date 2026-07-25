@@ -4,3 +4,7 @@ __pycache__/
 venv/
 .env/
 *.log
+ffmpeg.exe
+ffplay.exe
+ffprobe.exe
+history.json
