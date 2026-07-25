@@ -1,5 +1,3 @@
-"""V-Downloader v5.4 - A desktop GUI application for downloading videos from YouTube and other platforms."""
-
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, TclError
 import threading
@@ -15,35 +13,31 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 
-# CONFIG & THEME
+
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 class VideoDownloader(ctk.CTk):
-    """Main application window for V-Downloader.
-
-    Provides video preview, queue management, quality selection,
-    and download functionality with parallel execution.
-    """
+ 
 
     def __init__(self):
         super().__init__()
 
-        self.title("Video Downloader v5.4 Linux Stable")
+        self.title("Video Downloader v5.4")
         self.geometry("900x750")
 
-        # State
+
         self.download_path = ctk.StringVar()
         self.is_downloading = False
         self.history_file = "history.json"
         self.last_clipboard = ""
         self.queue_lock = threading.Lock()
         
-        # UI Layout
+
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        # SIDEBAR
+
         self.sidebar = ctk.CTkFrame(self, width=210, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
 
@@ -51,7 +45,7 @@ class VideoDownloader(ctk.CTk):
                                  font=ctk.CTkFont(size=25, weight="bold"), fg_color="#334155", corner_radius=14)
         self.logo.pack(pady=30, padx=15)
 
-        # Thumbnail Box
+
         self.thumb_label = ctk.CTkLabel(self.sidebar, text="Thumbnail...", text_color="#87CEEB", width=200, height=120, 
                                         fg_color="#0f172a", corner_radius=8)
         self.thumb_label.pack(pady=10, padx=20)
@@ -70,7 +64,7 @@ class VideoDownloader(ctk.CTk):
         self.btn_history = ctk.CTkButton(self.sidebar, text="📜 View History", command=self.show_history, fg_color="#1e293b", hover_color="#334155")
         self.btn_history.pack(pady=10, padx=20)
 
-        # THEME SWITCHER
+
         self.theme_label = ctk.CTkLabel(self.sidebar, text="Appearance Mode:", font=ctk.CTkFont(size=11))
         self.theme_label.pack(pady=(20, 0))
         self.theme_option = ctk.CTkOptionMenu(self.sidebar, values=["Dark", "Light", "System"],
@@ -81,7 +75,7 @@ class VideoDownloader(ctk.CTk):
         self.platform_label = ctk.CTkLabel(self.sidebar, text="Linux Optimized", font=ctk.CTkFont(size=10), text_color="#4ade80")
         self.platform_label.pack(side="bottom", pady=20)
 
-        # MAIN CONTENT
+
         self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
 
@@ -145,7 +139,7 @@ class VideoDownloader(ctk.CTk):
             return False
 
     def check_clipboard(self):
-        """Poll the system clipboard every 1.5 seconds; auto-fill URL if a valid link is found."""
+      
         try:
             current_clipboard = self.clipboard_get().strip()
             if current_clipboard != self.last_clipboard and self._is_valid_url(current_clipboard):
@@ -158,14 +152,14 @@ class VideoDownloader(ctk.CTk):
         self.after(1500, self.check_clipboard)
 
     def fetch_preview(self):
-        """Fetch and display video metadata (thumbnail, title, size, duration) for the URL in the entry widget."""
+    
         url = self.url_entry.get().strip()
         if not url or not self._is_valid_url(url): return
         self.thumb_label.configure(text="Loading...", image="")
         threading.Thread(target=self._get_meta_thread, args=(url,), daemon=True).start()
 
     def _get_meta_thread(self, url):
-        """Background thread: extract video info via yt_dlp and update UI with thumbnail and metadata."""
+     
         try:
             ydl_opts = {'quiet': True}
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -190,7 +184,7 @@ class VideoDownloader(ctk.CTk):
             self.after(0, lambda: self.status_label.configure(text=f"Preview Error: {e}"))
 
     def download_engine(self, url, folder, quality):
-        """Download a single video at the given *quality* into *folder*, updating the progress bar."""
+     
         def hook(d):
             if d['status'] == 'downloading':
                 p_str = d.get('_percent_str', '0%')
@@ -224,7 +218,7 @@ class VideoDownloader(ctk.CTk):
             self.after(0, lambda: self.status_label.configure(text=f"Download Error: {e}"))
 
     def save_to_json(self, title, url):
-        """Append a download record (title, url, timestamp) to the history JSON file."""
+     
         data = []
         if os.path.exists(self.history_file):
             try:
@@ -234,18 +228,18 @@ class VideoDownloader(ctk.CTk):
         with open(self.history_file, "w") as f: json.dump(data, f, indent=4)
 
     def browse(self):
-        """Open a folder-selection dialog and set the download path."""
+     
         folder = filedialog.askdirectory()
         if folder: self.download_path.set(folder)
 
     def open_folder(self):
-        """Open the current download folder in the system file manager."""
+     
         path = self.download_path.get()
         if os.path.exists(path):
             subprocess.run(['xdg-open', path])
 
     def add_to_queue(self):
-        """Add the URL from the entry widget to the download queue."""
+    
         url = self.url_entry.get().strip()
         if url and self._is_valid_url(url):
             with self.queue_lock:
@@ -255,27 +249,27 @@ class VideoDownloader(ctk.CTk):
         else: messagebox.showwarning("Warning", "Invalid URL!")
 
     def delete_selected(self):
-        """Remove the last item from the download queue."""
+     
         with self.queue_lock:
             if self.queue_data:
                 self.queue_data.pop()
         self.update_listbox()
 
     def update_listbox(self):
-        """Refresh the queue textbox display from the current queue_data list."""
+     
         self.queue_list.delete("0.0", "end")
         for i, url in enumerate(self.queue_data):
             self.queue_list.insert("end", f"{i+1}. {url}\n")
 
     def process_queue(self):
-        """Validate state and start the master download thread if not already downloading."""
+     
         if self.is_downloading or not self.queue_data or not self.download_path.get(): return
         self.is_downloading = True
         self.btn_download.configure(state="disabled", text="DOWNLOADING...")
         threading.Thread(target=self.master_download_thread, daemon=True).start()
 
     def master_download_thread(self):
-        """Background thread: drain the queue and download all URLs via a thread pool."""
+     
         folder, quality = self.download_path.get(), self.quality_box.get()
         with self.queue_lock:
             urls = list(self.queue_data)
@@ -286,14 +280,14 @@ class VideoDownloader(ctk.CTk):
         self.after(0, self.finish_all)
 
     def finish_all(self):
-        """Re-enable UI controls and notify the user that all downloads are complete."""
+      
         self.is_downloading = False
         self.btn_download.configure(state="normal", text="Start Download")
         self.status_label.configure(text="Done! ✅")
         messagebox.showinfo("V-DL", "All downloads completed!")
 
     def show_history(self):
-        """Open a popup window displaying the last 20 download history entries."""
+     
         if not os.path.exists(self.history_file):
             messagebox.showinfo("History", "No download history yet.")
             return
