@@ -35,7 +35,7 @@
 Sebelum menjalankan, pastikan perangkat Anda sudah terinstall:
 
 1.  **Python 3.10+**
-2.  **FFmpeg:** Wajib ada agar fitur penggabungan video/audio dan penulisan metadata (Cover Art) berfungsi.
+2.  **FFmpeg:** Wajib dan harus ada agar fitur penggabungan video/audio dan penulisan metadata (Cover Art) berfungsi.
     * *Tips: Ensure ffmpeg is installed on your system (e.g., `sudo apt install ffmpeg`) or specify its path.*
 
 ---
