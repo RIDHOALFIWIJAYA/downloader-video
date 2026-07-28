@@ -127,11 +127,11 @@ class VideoDownloader(ctk.CTk):
         self.check_clipboard()
 
     def change_appearance_mode_event(self, new_appearance_mode: str):
-        """Switch the UI appearance mode (Dark, Light, System)."""
+       
         ctk.set_appearance_mode(new_appearance_mode)
 
     def _is_valid_url(self, url):
-        """Return True if *url* is a well-formed HTTP/HTTPS URL."""
+        
         try:
             result = urlparse(url)
             return result.scheme in ('http', 'https') and bool(result.netloc)
