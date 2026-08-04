@@ -3,6 +3,7 @@ from tkinter import filedialog, messagebox, TclError
 import threading
 import yt_dlp
 import os
+import sys
 import re
 import json
 import subprocess
@@ -12,6 +13,11 @@ from io import BytesIO
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
+
+CLIPBOARD_POLL_MS = 1500
+MAX_HISTORY_DISPLAY = 20
+MAX_DOWNLOAD_WORKERS = 2
+DEFAULT_DOWNLOAD_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
 
 
 ctk.set_appearance_mode("dark")
@@ -27,8 +33,9 @@ class VideoDownloader(ctk.CTk):
         self.geometry("900x750")
 
 
-        self.download_path = ctk.StringVar()
+        self.download_path = ctk.StringVar(value=DEFAULT_DOWNLOAD_DIR)
         self.is_downloading = False
+        self.cancel_download = False
         self.history_file = "history.json"
         self.last_clipboard = ""
         self.queue_lock = threading.Lock()
@@ -72,7 +79,13 @@ class VideoDownloader(ctk.CTk):
         self.theme_option.set("Dark")
         self.theme_option.pack(pady=10, padx=20)
 
-        self.platform_label = ctk.CTkLabel(self.sidebar, text="Linux Optimized", font=ctk.CTkFont(size=10), text_color="#4ade80")
+        if sys.platform == 'win32':
+            platform_text = "Windows"
+        elif sys.platform == 'darwin':
+            platform_text = "macOS"
+        else:
+            platform_text = "Linux"
+        self.platform_label = ctk.CTkLabel(self.sidebar, text=platform_text, font=ctk.CTkFont(size=10), text_color="#4ade80")
         self.platform_label.pack(side="bottom", pady=20)
 
 
@@ -122,7 +135,11 @@ class VideoDownloader(ctk.CTk):
 
         self.btn_download = ctk.CTkButton(self.main_frame, text="Start Download", command=self.process_queue, height=50, 
                                           font=ctk.CTkFont(size=14, weight="bold"), fg_color=("#0ea5e9", "#1f6aa5"), hover_color="#0284c7")
-        self.btn_download.pack(fill="x", pady=20)
+        self.btn_download.pack(fill="x", pady=(20, 5))
+
+        self.btn_cancel = ctk.CTkButton(self.main_frame, text="Cancel Download", command=self.cancel_active_download,
+                                        height=35, fg_color="#ef4444", hover_color="#dc2626", state="disabled")
+        self.btn_cancel.pack(fill="x", pady=(0, 10))
 
         self.check_clipboard()
 
@@ -149,7 +166,7 @@ class VideoDownloader(ctk.CTk):
                 self.fetch_preview()
         except (TclError, OSError):
             pass
-        self.after(1500, self.check_clipboard)
+        self.after(CLIPBOARD_POLL_MS, self.check_clipboard)
 
     def fetch_preview(self):
     
@@ -175,17 +192,22 @@ class VideoDownloader(ctk.CTk):
                 self.after(0, lambda: self.size_label.configure(text=f"Size: ~{size_str}"))
                 self.after(0, lambda: self.duration_label.configure(text=f"Duration: {dur_str}"))
 
-                resp = requests.get(thumb_url, timeout=10)
-                img = Image.open(BytesIO(resp.content))
-                ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(180, 101))
-                self.after(0, lambda: self.thumb_label.configure(image=ctk_img, text=""))
+                if thumb_url:
+                    resp = requests.get(thumb_url, timeout=10)
+                    img = Image.open(BytesIO(resp.content))
+                    ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(180, 101))
+                    self.after(0, lambda: self.thumb_label.configure(image=ctk_img, text=""))
         except (yt_dlp.utils.DownloadError, requests.RequestException, OSError, ValueError) as e:
             self.after(0, lambda: self.thumb_label.configure(text="Preview Error", image=""))
             self.after(0, lambda: self.status_label.configure(text=f"Preview Error: {e}"))
 
     def download_engine(self, url, folder, quality):
-     
+        if self.cancel_download:
+            return False
+
         def hook(d):
+            if self.cancel_download:
+                raise yt_dlp.utils.DownloadError("Cancelled by user")
             if d['status'] == 'downloading':
                 p_str = d.get('_percent_str', '0%')
                 clean_p = re.sub(r'\x1b\[[0-9;]*m', '', p_str).replace('%', '').strip()
@@ -214,8 +236,11 @@ class VideoDownloader(ctk.CTk):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 meta = ydl.extract_info(url, download=True)
                 self.save_to_json(meta.get('title', 'Unknown'), url)
+                return True
         except (yt_dlp.utils.DownloadError, OSError, ValueError) as e:
-            self.after(0, lambda: self.status_label.configure(text=f"Download Error: {e}"))
+            if not self.cancel_download:
+                self.after(0, lambda: self.status_label.configure(text=f"Download Error: {e}"))
+            return False
 
     def save_to_json(self, title, url):
      
@@ -233,9 +258,15 @@ class VideoDownloader(ctk.CTk):
         if folder: self.download_path.set(folder)
 
     def open_folder(self):
-     
         path = self.download_path.get()
-        if os.path.exists(path):
+        if not path or not os.path.exists(path):
+            messagebox.showwarning("Warning", "Folder tidak ditemukan!")
+            return
+        if sys.platform == 'win32':
+            os.startfile(path)
+        elif sys.platform == 'darwin':
+            subprocess.run(['open', path])
+        else:
             subprocess.run(['xdg-open', path])
 
     def add_to_queue(self):
@@ -256,52 +287,74 @@ class VideoDownloader(ctk.CTk):
         self.update_listbox()
 
     def update_listbox(self):
-     
         self.queue_list.delete("0.0", "end")
-        for i, url in enumerate(self.queue_data):
-            self.queue_list.insert("end", f"{i+1}. {url}\n")
+        with self.queue_lock:
+            for i, url in enumerate(self.queue_data):
+                self.queue_list.insert("end", f"{i+1}. {url}\n")
 
     def process_queue(self):
-     
-        if self.is_downloading or not self.queue_data or not self.download_path.get(): return
+        if self.is_downloading: return
+        if not self.queue_data:
+            messagebox.showwarning("Warning", "Queue kosong! Tambahkan URL terlebih dahulu.")
+            return
+        if not self.download_path.get():
+            messagebox.showwarning("Warning", "Pilih folder download terlebih dahulu!")
+            return
         self.is_downloading = True
+        self.cancel_download = False
         self.btn_download.configure(state="disabled", text="DOWNLOADING...")
+        self.btn_cancel.configure(state="normal")
         threading.Thread(target=self.master_download_thread, daemon=True).start()
 
+    def cancel_active_download(self):
+        if self.is_downloading:
+            self.cancel_download = True
+            self.status_label.configure(text="Membatalkan download...")
+
     def master_download_thread(self):
-     
         folder, quality = self.download_path.get(), self.quality_box.get()
         with self.queue_lock:
             urls = list(self.queue_data)
             self.queue_data.clear()
         self.after(0, self.update_listbox)
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            executor.map(lambda u: self.download_engine(u, folder, quality), urls)
-        self.after(0, self.finish_all)
+        success, failed = 0, 0
+        with ThreadPoolExecutor(max_workers=MAX_DOWNLOAD_WORKERS) as executor:
+            results = executor.map(lambda u: self.download_engine(u, folder, quality), urls)
+            for r in results:
+                if r: success += 1
+                else: failed += 1
+        self.after(0, lambda: self.finish_all(success, failed))
 
-    def finish_all(self):
-      
+    def finish_all(self, success=0, failed=0):
+        was_cancelled = self.cancel_download
         self.is_downloading = False
+        self.cancel_download = False
         self.btn_download.configure(state="normal", text="Start Download")
-        self.status_label.configure(text="Done! ✅")
-        messagebox.showinfo("V-DL", "All downloads completed!")
+        self.btn_cancel.configure(state="disabled")
+        if was_cancelled:
+            self.status_label.configure(text="Download dibatalkan.")
+        elif failed == 0:
+            self.status_label.configure(text=f"Selesai! {success} file berhasil diunduh.")
+            messagebox.showinfo("V-DL", f"Semua download selesai! ({success} file)")
+        else:
+            self.status_label.configure(text=f"Selesai: {success} sukses, {failed} gagal.")
+            messagebox.showwarning("V-DL", f"Download selesai.\n{success} berhasil, {failed} gagal.")
 
     def show_history(self):
-     
         if not os.path.exists(self.history_file):
-            messagebox.showinfo("History", "No download history yet.")
+            messagebox.showinfo("History", "Belum ada riwayat download.")
             return
         try:
             with open(self.history_file, "r") as f:
                 data = json.load(f)
         except (json.JSONDecodeError, OSError):
-            messagebox.showinfo("History", "History file is corrupt or unreadable.")
+            messagebox.showinfo("History", "File history corrupt atau tidak bisa dibaca.")
             return
         if not data:
-            messagebox.showinfo("History", "No download history yet.")
+            messagebox.showinfo("History", "Belum ada riwayat download.")
             return
         lines = []
-        for i, entry in enumerate(data[-20:], 1):
+        for i, entry in enumerate(data[-MAX_HISTORY_DISPLAY:], 1):
             lines.append(f"{i}. {entry.get('title', '?')}\n   {entry.get('timestamp', '?')}\n   {entry.get('url', '?')}")
         history_text = "\n\n".join(lines)
         win = ctk.CTkToplevel(self)
@@ -311,6 +364,22 @@ class VideoDownloader(ctk.CTk):
         textbox.pack(fill="both", expand=True, padx=10, pady=10)
         textbox.insert("0.0", history_text)
         textbox.configure(state="disabled")
+
+        def clear_history():
+            if messagebox.askyesno("Konfirmasi", "Hapus semua riwayat download?"):
+                try:
+                    with open(self.history_file, "w") as f:
+                        json.dump([], f)
+                    textbox.configure(state="normal")
+                    textbox.delete("0.0", "end")
+                    textbox.insert("0.0", "Riwayat sudah dihapus.")
+                    textbox.configure(state="disabled")
+                except OSError:
+                    messagebox.showerror("Error", "Gagal menghapus history.")
+
+        btn_clear = ctk.CTkButton(win, text="Hapus Riwayat", fg_color="#ef4444",
+                                   hover_color="#dc2626", command=clear_history)
+        btn_clear.pack(pady=5)
 
 if __name__ == "__main__":
     app = VideoDownloader()
