@@ -23,13 +23,16 @@ DEFAULT_DOWNLOAD_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
+if getattr(sys, 'frozen', False):
+    os.environ['PATH'] = os.path.dirname(sys.executable) + os.pathsep + os.environ.get('PATH', '')
+
 class VideoDownloader(ctk.CTk):
  
 
     def __init__(self):
         super().__init__()
 
-        self.title("Video Downloader v5.4")
+        self.title("V-Downloader")
         self.geometry("900x750")
 
 

@@ -8,3 +8,6 @@ ffmpeg.exe
 ffplay.exe
 ffprobe.exe
 history.json
+build
+dist
+V-Downloader.spec
